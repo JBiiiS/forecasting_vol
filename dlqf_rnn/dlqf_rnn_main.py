@@ -4,13 +4,6 @@ import numpy as np
 
 from dlqf_rnn_config import DLQFRNNConfig 
 
-# ─────────────────────────────────────────
-# 1. BiLSTM Encoder
-    #    3장 LSTM과의 차이:
-    #    - bidirectional=True → output이 hidden_dim * 2
-    #    - z 입력 없음 (단발성 예측이라 autoregressive 불필요)
-    #    - 마지막 시점 hidden만 반환
-# ─────────────────────────────────────────
 class BiLSTMEncoder(nn.Module):
     def __init__(self, config: DLQFRNNConfig):
         super().__init__()
@@ -34,14 +27,7 @@ class BiLSTMEncoder(nn.Module):
                 param.data[n // 4: n // 2].fill_(1.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        x      : (B, T, input_dim)
-        반환   : (B, hidden_dim * 2) — 마지막 시점 hidden state
-        
-        ★ 3장과의 차이:
-        3장은 (B, T, hidden_dim) 전체 반환 → 각 시점마다 분위수 예측
-        4장은 (B, hidden_dim*2) 마지막만 반환 → 내일 분포 하나만 예측
-        """
+
         lstm_output, _ = self.bilstm(x)       # (B, T, hidden_dim * 2)
         h_last = lstm_output[:, -1, :]        # (B, hidden_dim * 2)
         # Because the bidirection is activated, h_t is composed of alternating h_t of each direction such as forward -> backward -> forward -> ..., so that h_t[-1] isn't consolidated form, but only h_t of final backward lstm, while h[:, -1, :] contains  concatenated shape([b, 2h]) automatically
@@ -49,11 +35,7 @@ class BiLSTMEncoder(nn.Module):
         return h_last
 
 
-# ─────────────────────────────────────────
-# 2. NQF (Neural Quantile Function)
-#    3장이랑 동일 — 단조증가 보장: weight 제곱
-#    입력 차원만 hidden_dim*2로 변경
-# ─────────────────────────────────────────
+
 class NQF(nn.Module):
     def __init__(self, config: DLQFRNNConfig):
         super().__init__()
@@ -88,11 +70,6 @@ class NQF(nn.Module):
             # No activation on final layer—output is log-space
         return x 
 
-
-# ─────────────────────────────────────────
-# 3. DLQF 전체 모델
-#    Encoder(BiLSTM) + Decoder(NQF)
-# ─────────────────────────────────────────
 class DLQFRNN(nn.Module):
     def __init__(self, config: DLQFRNNConfig):
         super().__init__()
@@ -157,14 +134,12 @@ class DLQFRNN(nn.Module):
         return rv_hat, rv_base, gamma
 
 
-# ─────────────────────────────────────────
-# 4. L2 Distance Loss (Algorithm 2)
-#    두 경험적 분포 사이의 L2 distance
-#    = Wasserstein / Energy distance 계열
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
+# Loss Functions
+# ---------------------------------------------------------
 def l2_distance_loss(
-    r_true: torch.Tensor,   # (B, M) — 실제 |r| 정렬값
-    r_pred: torch.Tensor,   # (B, M) — 예측 분위수 정렬값
+    r_true: torch.Tensor,   # (B, M)
+    r_pred: torch.Tensor,   # (B, M)
 ) -> torch.Tensor:
     """
     Algorithm 2 벡터화 구현.
@@ -215,10 +190,7 @@ def mse_loss(
     return mse
 
 
-# ─────────────────────────────────────────
-# 6. QLIKE Loss (Quasi-Likelihood)
-#    고변동성 과소예측에 더 큰 페널티
-# ─────────────────────────────────────────
+
 def qlike_loss(
     rv_true: torch.Tensor,   # (B,) — 실제 실현변동성
     rv_pred: torch.Tensor,   # (B,) — 예측 실현변동성
