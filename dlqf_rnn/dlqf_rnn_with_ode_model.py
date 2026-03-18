@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchdiffeq import odeint
-from dlqf_rnn_with_ode_config import DLQFRNNWithODEConfig
+from dlqf_rnn.dlqf_rnn_with_ode_config import DLQFRNNWithODEConfig
 
 class LipSwish(nn.Module):
     def forward(self, x):

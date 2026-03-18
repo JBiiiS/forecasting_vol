@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from dlqf_rnn_with_ode_config import DLQFRNNWithODEConfig
-from dlqf_rnn_with_ode_model import ODEGenerator
-from dlqf_rnn_with_ode_discriminator import CDEDiscriminator
+from dlqf_rnn.dlqf_rnn_with_ode_config import DLQFRNNWithODEConfig
+from dlqf_rnn.dlqf_rnn_with_ode_model import ODEGenerator
+from dlqf_rnn.dlqf_rnn_with_ode_discriminator import CDEDiscriminator
 
 
 class BiLSTMEncoder(nn.Module):

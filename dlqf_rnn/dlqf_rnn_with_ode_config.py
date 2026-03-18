@@ -1,6 +1,6 @@
 import torch
 from dataclasses import dataclass
-from dlqf_rnn_config import DLQFRNNConfig
+from dlqf_rnn.dlqf_rnn_config import DLQFRNNConfig
 
 
 @dataclass

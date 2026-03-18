@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from dlqf_rnn_config import DLQFRNNConfig 
+from dlqf_rnn.dlqf_rnn_config import DLQFRNNConfig 
 
 class BiLSTMEncoder(nn.Module):
     def __init__(self, config: DLQFRNNConfig):
