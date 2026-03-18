@@ -140,16 +140,11 @@ def _train_with_cde(
 
     if config.only_d_epoch <= current_epoch:
 
-        # We must compute a fresh forward pass (or use the non-detached r_q_ode)
-        # to maintain the computational graph back to the Generator's parameters.
-        # Since we already computed r_q_ode above and didn't detach the original tensor,
-        # we can simply reuse it to save heavy ODE integration computations.
-        
+       
         # A. Base Geometrical Loss (Maintaining the ODE's fundamental structure)
         loss_l2 = l2_distance_loss(y_b, r_q_ode)
 
         # B. Adversarial Loss (Tricking the Discriminator)
-        # We pass the non-detached trajectory so gradients flow back to the ODE.
         gen_fake_score = model2(r_q_ode)
         loss_gan = -gen_fake_score.mean()
 

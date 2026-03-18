@@ -9,8 +9,6 @@ class BaseConfig:
     # ----------------------------------
     seed: int = 42
     
-    # device는 저장(Serialization)을 위해 str로 관리하고,
-    # 실제 사용할 때 torch.device로 변환하는 프로퍼티를 씁니다.
     device_name: str = "cuda" if torch.cuda.is_available() else "cpu"
 
     # ----------------------------------
@@ -30,18 +28,14 @@ class BaseConfig:
 
     
     # ----------------------------------
-    # [3] 유틸리티 메서드 (필수!)
+    # [3] 유틸리티 메서드
     # ----------------------------------
     @property # making a function call look like a variable access
     def device(self):
-        """실제 코드에서 cfg.device로 접근할 때 호출됨"""
         return torch.device(self.device_name)
 
     def to_dict(self):
-        """설정값을 딕셔너리로 변환 (로그 저장용)"""
         return asdict(self)
     
     def __post_init__(self):
-        # 객체가 생성된 직후에 자동으로 실행됨
-        # 여기서 의존성 있는 계산을 수행합니다.
         self.dt = self.T / self.steps

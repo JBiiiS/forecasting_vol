@@ -54,20 +54,15 @@ class NQF(nn.Module):
         self.activation = nn.Tanh()
         
     def forward(self, h: torch.Tensor, alpha: torch.Tensor) -> torch.Tensor:
-        """
-        h     : (B, hidden_dim * 2)
-        alpha : (B,)
-        반환  : (B, 1)
-        """
+       
         x = torch.cat([h, alpha.unsqueeze(-1)], dim=-1)
 
         for i, layer in enumerate(self.layers):
-            weight_sq = layer.weight ** 2   # Monotonicity preserved throughout
+            weight_sq = layer.weight ** 2   
             x = torch.nn.functional.linear(x, weight_sq, layer.bias)
             
             if i < len(self.layers) - 1:
-                x = self.activation(x)  # Tanh for intermediate layers
-            # No activation on final layer—output is log-space
+                x = self.activation(x)  
         return x 
 
 class DLQFRNN(nn.Module):
@@ -90,11 +85,7 @@ class DLQFRNN(nn.Module):
         nn.init.zeros_(self.correction_head.bias)
 
     def forward(self, x: torch.Tensor, alpha: torch.Tensor) -> torch.Tensor:
-        """
-        x     : (B, T, input_dim)
-        alpha : (M,) — 분위수 레벨 [1/M, 2/M, ..., 1]
-        반환  : (B, M) — 내일 |r|의 분위수 78개
-        """
+
         h = self.encoder(x)     # (B, hidden_dim * 2)
         B = h.shape[0]
         M = alpha.shape[0]
@@ -116,13 +107,7 @@ class DLQFRNN(nn.Module):
         return r_q, gamma
 
     def estimate_rv(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        분위수 78개 뽑아서 RV 추정
-        논문 4.2.3: RV_hat = Σ r²_{q,i} / scale_factor²
-
-        x      : (B, T, input_dim)
-        반환   : (B,)
-        """
+        
         M = self.config.total_quantile
         sf = self.config.scale_factor
         alpha = torch.linspace(1 / M, 1, M).to(x.device)
@@ -141,11 +126,7 @@ def l2_distance_loss(
     r_true: torch.Tensor,   # (B, M)
     r_pred: torch.Tensor,   # (B, M)
 ) -> torch.Tensor:
-    """
-    Algorithm 2 벡터화 구현.
-    실제 M개 + 예측 M개를 합쳐 2M개로 정렬 후
-    두 CDF 곡선 사이 넓이(L2 norm) 계산.
-    """
+    
     B, M = r_true.shape
 
     # 실제 + 예측 합쳐서 정렬
@@ -172,7 +153,6 @@ def l2_distance_loss(
 
 # ─────────────────────────────────────────
 # 5. MSE Loss (Mean Squared Error)
-#    실현변동성의 제곱 오차
 # ────────────────────────────────────────
 def mse_loss(
     rv_true: torch.Tensor,   # (B,) — 실제 실현변동성
@@ -195,22 +175,7 @@ def qlike_loss(
     rv_true: torch.Tensor,   # (B,) — 실제 실현변동성
     rv_pred: torch.Tensor,   # (B,) — 예측 실현변동성
 ) -> torch.Tensor:
-    """
-    Quasi-Likelihood Loss (QLIKE)
     
-    고변동성(RV_true가 클 때)이 과소예측(RV_pred < RV_true)될 때
-    지수적으로 더 큰 페널티를 부여하는 손실함수.
-    
-    QLIKE = (1/T) * Σ [RV_t / RV_hat_t - log(RV_t / RV_hat_t) - 1]
-    
-    이는 RV_pred < RV_true인 경우 (under-prediction)에 매우 큰 값이 되므로,
-    리스크 관리 관점에서 고변동성을 놓치지 않도록 강제함.
-    
-    rv_true : (B,) — 실제 실현변동성
-    rv_pred : (B,) — 예측 실현변동성
-    반환    : scalar — QLIKE loss
-    """
-    # 수치 안정성: 매우 작은 값 피하기
     epsilon = 1e-8
     rv_pred_safe = torch.clamp(rv_pred, min=epsilon)
     rv_true_safe = torch.clamp(rv_true, min=epsilon)

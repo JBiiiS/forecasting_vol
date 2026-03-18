@@ -15,19 +15,6 @@ class LipSwish(torch.nn.Module):
 # =============================================================================
 
 class CDEFunc(nn.Module):
-    """
-    The vector field of the Neural CDE discriminator:
-        dh = f_φ(t, h) dX(t)
-
-    f_φ maps (t, h) to a matrix of shape (cde_hidden_dim, output_dim),
-    so that dh = f_φ(t, h) @ dX(t) is a well-defined vector in R^cde_hidden_dim.
-
-    Time t is concatenated to h for non-autonomous dynamics,
-    using the same torch.full pattern as SDEDrift / SDEDiffusion.
-
-    Input  : (t, h)  →  [0-dim scalar tensor, (B, cde_hidden_dim)]
-    Output : (B, cde_hidden_dim, output_dim)
-    """
 
     def __init__(self, config: DLQFRNNWithODEConfig):
         super().__init__()
@@ -39,7 +26,6 @@ class CDEFunc(nn.Module):
             LipSwish(),
             nn.Linear(self.cde_hidden_dim, self.cde_hidden_dim),
             LipSwish(),
-            # Output: one row per hidden unit, one column per input channel
             nn.Linear(self.cde_hidden_dim, self.cde_hidden_dim * self.output_dim),
             nn.Tanh()
         )
@@ -49,27 +35,17 @@ class CDEFunc(nn.Module):
                 nn.init.constant_(m.bias, val=0)
 
     def forward(self, t, h):
-        """
-        Args:
-            t : 0-dim scalar tensor — current time (passed by torchcde)
-            h : (B, cde_hidden_dim) — current CDE hidden state
-        Returns:
-            (B, cde_hidden_dim, output_dim) — matrix field
-        """
-        # Same pattern as SDEDrift: broadcast 0-dim scalar t to (B, 1)
+       
         t_batch = torch.full((h.size(0), 1), float(t.detach()), device=h.device, dtype=h.dtype)
-        th  = torch.cat([t_batch, h], dim=-1)               # (B, 1 + cde_hidden_dim)
-        out = self.net(th)                                   # (B, cde_hidden_dim * output_dim)
+        th  = torch.cat([t_batch, h], dim=-1)               
+        out = self.net(th)                                  
         return out.view(h.size(0), self.cde_hidden_dim, self.output_dim)
     
-    # =============================================================================
+# =============================================================================
 # [2] CDEDiscriminator — full Neural CDE discriminator
 # =============================================================================
 
 class CDEDiscriminator(nn.Module):
-    """
-    Neural CDE discriminator (Kidger et al., 2021b).
-    """
 
     def __init__(self, config:DLQFRNNWithODEConfig):
         super().__init__()
@@ -100,12 +76,7 @@ class CDEDiscriminator(nn.Module):
    
 
     def forward(self, x: torch.Tensor, times: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x     : (B, steps, output_dim) — real or subsampled generated path
-            times : (steps,)               — sde_times_matched for both real and fake
-        """
-        
+       
         # ------------------------------------------------------------------
         # [1] Build continuous interpolation from discrete path
         # ------------------------------------------------------------------
@@ -118,14 +89,10 @@ class CDEDiscriminator(nn.Module):
         x0 = interpolated_x.evaluate(interpolated_x.interval[0]) 
         h0 = self.h0_linear(x0)                # (B, cde_hidden_dim)
 
-        # ------------------------------------------------------------------
-        # [★ 핵심 패치 ★] Adjoint Method를 위한 파라미터 명시적 수집
-        # ------------------------------------------------------------------
-        # CDE 벡터 필드의 가중치와, Generator로 역전파될 궤적(coeffs)을 튜플로 묶습니다.
         adjoint_params = tuple(self.cde_func.parameters()) + (coeffs,)
 
         # ------------------------------------------------------------------
-        # [3] Integrate CDE using the 'torchsde' backend and 'reversible_heun'
+        # [3] Integrate CDE 
         # ------------------------------------------------------------------
         h = torchcde.cdeint(
             X       = interpolated_x,
@@ -134,7 +101,7 @@ class CDEDiscriminator(nn.Module):
             t       = interpolated_x.interval,
             method  = 'dopri5',    
             adjoint = True,        
-            adjoint_params = adjoint_params, # <--- 누락되었던 파라미터 추가!
+            adjoint_params = adjoint_params, 
             atol    = 1e-4,      
             rtol    = 1e-4       
         )
